@@ -3,6 +3,9 @@ import {
     Button,
     Box,
     Paper,
+    TextField,
+    Checkbox,
+    FormControlLabel,
     Table,
     TableBody,
     TableCell,
@@ -13,47 +16,85 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    TextField,
-    Checkbox,
-    FormControlLabel
+    IconButton,
 } from '@mui/material';
 import { useState } from 'react';
+import { Edit, Delete } from '@mui/icons-material';
+import { trpc } from '@/utils/trpc';
 
 interface Props {
     onLogout: () => void;
 }
 
-const mockSecrets = [
-    {
-        id: '1',
-        content: 'My secret message...',
-        viewed: false,
-        oneTime: true,
-        expiresAt: '2025-06-30T10:00',
-    },
-    {
-        id: '2',
-        content: 'Another one',
-        viewed: true,
-        oneTime: false,
-        expiresAt: '2024-06-24T12:00',
-    },
-];
+interface Secret {
+    id: string;
+    content: string;
+    viewed: boolean;
+    oneTime: boolean;
+    expiresAt: Date;
+    // password: string | null;
+    // createdAt: Date;
+    // updatedAt: Date;
+}
 
 export default function Dashboard({ onLogout }: Props) {
+    const createSecret = trpc.secret.createSecret.useMutation();
+    const { data: secrets, isLoading: isLoadingSecrets } = trpc.secret.getSecrets.useQuery();
+    console.log('secrets', secrets, isLoadingSecrets);
+    const [search, setSearch] = useState('');
+
     const [open, setOpen] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+
     const [secret, setSecret] = useState('');
     const [viewOnce, setViewOnce] = useState(true);
     const [requirePassword, setRequirePassword] = useState(true);
     const [password, setPassword] = useState('');
+
+    const [deleteTarget, setDeleteTarget] = useState<Secret | null>(null);
 
     const defaultExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
         .toISOString()
         .slice(0, 16);
     const [expiresAt, setExpiresAt] = useState(defaultExpiry);
 
-    const handleOpen = () => setOpen(true);
-    const handleClose = () => setOpen(false);
+    const isExpired = (expiresAt: Date) => expiresAt < new Date();
+
+    const handleOpenCreate = () => {
+        setEditMode(false);
+        setEditingId(null);
+        resetForm();
+        setOpen(true);
+    };
+
+    const handleEdit = (secret: Secret) => {
+        setEditMode(true);
+        setEditingId(secret.id);
+        setSecret(secret.content);
+        setViewOnce(secret.oneTime);
+        setExpiresAt(new Date(secret.expiresAt).toISOString().slice(0, 16));
+        setRequirePassword(false); // Optional: assume not needed for edit
+        setPassword('');
+        setOpen(true);
+    };
+
+    // const handleDelete = (id: string) => {
+    //     // handle delete here
+    // };
+
+    const resetForm = () => {
+        setSecret('');
+        setPassword('');
+        setExpiresAt(defaultExpiry);
+        setRequirePassword(true);
+        setViewOnce(true);
+    };
+
+    const handleClose = () => {
+        resetForm();
+        setOpen(false);
+    };
 
     const handleSubmit = () => {
         const payload = {
@@ -62,26 +103,45 @@ export default function Dashboard({ onLogout }: Props) {
             password: requirePassword ? password : undefined,
             expiresAt,
         };
-        console.log('Submitting Secret:', payload);
-        // Reset form
-        setSecret('');
-        setPassword('');
-        setExpiresAt(defaultExpiry);
-        setRequirePassword(true);
-        setViewOnce(true);
+
+        if (editMode && editingId) {
+            // editing mode is here
+        } else {
+            createSecret.mutate(payload, {
+                onSuccess: () => {
+                    console.log('Secret created!');
+                    // You can refetch secrets or clear form here
+                },
+                onError: (err) => {
+                    console.error('Failed to create secret:', err);
+                },
+            });
+        }
         handleClose();
     };
 
-    const isExpired = (expiresAt: string) => {
-        return new Date(expiresAt) < new Date();
+    const filteredSecrets = (secrets || []).filter((s) =>
+        s.content.toLowerCase().includes(search.toLowerCase())
+    );
+
+    const handleDeleteClick = (secret: Secret) => {
+        setDeleteTarget(secret);
     };
+
+    const confirmDelete = () => {
+        if (deleteTarget) {
+           // delete secret here
+            setDeleteTarget(null);
+        }
+    };
+
 
     return (
         <Box sx={{ width: '100%', minHeight: '100vh', p: 4 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
                 <Typography variant="h4">🔐 Secrets Dashboard</Typography>
                 <Box display="flex" gap={2}>
-                    <Button variant="contained" onClick={handleOpen}>
+                    <Button variant="contained" onClick={handleOpenCreate}>
                         Add Secret
                     </Button>
                     <Button variant="outlined" onClick={onLogout}>
@@ -91,9 +151,17 @@ export default function Dashboard({ onLogout }: Props) {
             </Box>
 
             <Paper sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                    Your Secrets
-                </Typography>
+                <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
+                    <Typography variant="h6">Your Secrets</Typography>
+                    <TextField
+                        size="small"
+                        placeholder="Search..."
+                        value={search}
+                        sx={{ width: '60%' }}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </Box>
+
                 <TableContainer>
                     <Table>
                         <TableHead>
@@ -103,21 +171,34 @@ export default function Dashboard({ onLogout }: Props) {
                                 <TableCell>Viewed</TableCell>
                                 <TableCell>Expires At</TableCell>
                                 <TableCell>Status</TableCell>
+                                <TableCell>Actions</TableCell>
                             </TableRow>
                         </TableHead>
+
                         <TableBody>
-                            {mockSecrets.map((secret) => (
+                            {filteredSecrets.map((secret) => (
                                 <TableRow key={secret.id}>
                                     <TableCell>{secret.content.slice(0, 30)}...</TableCell>
                                     <TableCell>{secret.oneTime ? 'Yes' : 'No'}</TableCell>
                                     <TableCell>{secret.viewed ? '✅' : '❌'}</TableCell>
-                                    <TableCell>{new Date(secret.expiresAt).toLocaleString()}</TableCell>
+                                    <TableCell>
+                                        {new Date(secret.expiresAt).toLocaleString()}
+                                    </TableCell>
                                     <TableCell>
                                         {isExpired(secret.expiresAt)
                                             ? 'Expired'
                                             : secret.viewed && secret.oneTime
                                                 ? 'Deleted'
-                                                : 'Active'}
+                                                : 'Active'
+                                        }
+                                    </TableCell>
+                                    <TableCell>
+                                        <IconButton onClick={() => handleEdit(secret)}>
+                                            <Edit />
+                                        </IconButton>
+                                        <IconButton onClick={() => handleDeleteClick(secret)}>
+                                            <Delete />
+                                        </IconButton>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -126,9 +207,9 @@ export default function Dashboard({ onLogout }: Props) {
                 </TableContainer>
             </Paper>
 
-            {/* 👇 Secret Creation Modal */}
+            {/* Secret Modal */}
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-                <DialogTitle>Create a New Secret</DialogTitle>
+                <DialogTitle>{editMode ? 'Edit Secret' : 'Create a New Secret'}</DialogTitle>
                 <DialogContent>
                     <Box display="flex" flexDirection="column" gap={2} mt={1}>
                         <TextField
@@ -147,7 +228,7 @@ export default function Dashboard({ onLogout }: Props) {
                                     onChange={(e) => setViewOnce(e.target.checked)}
                                 />
                             }
-                            label="View Once (default)"
+                            label="View Once"
                         />
 
                         <TextField
@@ -165,7 +246,7 @@ export default function Dashboard({ onLogout }: Props) {
                                     onChange={(e) => setRequirePassword(e.target.checked)}
                                 />
                             }
-                            label="Require Password (default)"
+                            label="Require Password"
                         />
 
                         {requirePassword && (
@@ -182,7 +263,19 @@ export default function Dashboard({ onLogout }: Props) {
                 <DialogActions>
                     <Button onClick={handleClose}>Cancel</Button>
                     <Button onClick={handleSubmit} variant="contained">
-                        Save Secret
+                        {editMode ? 'Update' : 'Save'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog open={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+                <DialogTitle>Delete Secret</DialogTitle>
+                <DialogContent>
+                    <Typography>Are you sure you want to delete this secret?</Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
+                    <Button onClick={confirmDelete} color="error" variant="contained">
+                        Delete
                     </Button>
                 </DialogActions>
             </Dialog>
