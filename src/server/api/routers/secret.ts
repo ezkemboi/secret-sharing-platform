@@ -2,8 +2,9 @@
 import { router, publicProcedure } from '../trpc';
 
 export const secretRouter = router({
-    ping: publicProcedure.query(() => {
-        return { message: 'pong from tRPC' };
+    getSecrets: publicProcedure.query(async ({ ctx }) => {
+        return ctx.prisma.secret.findMany({
+            orderBy: {createdAt: 'desc'},
+        });
     }),
-
 });

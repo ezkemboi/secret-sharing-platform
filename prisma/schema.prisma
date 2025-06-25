@@ -13,3 +13,14 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model Secret {
+  id           String   @id @default(uuid())
+  content      String
+  oneTime      Boolean  @default(true)
+  viewed       Boolean  @default(false)
+  expiresAt    DateTime
+  password     String?  // optional if password protected
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
