@@ -17,6 +17,7 @@ import {
     DialogContent,
     DialogActions,
     IconButton,
+    Chip
 } from '@mui/material';
 import { useState } from 'react';
 import { Edit, Delete } from '@mui/icons-material';
@@ -39,8 +40,10 @@ interface Secret {
 
 export default function Dashboard({ onLogout }: Props) {
     const createSecret = trpc.secret.createSecret.useMutation();
+    const updateSecret = trpc.secret.updateSecret.useMutation();
+    const deleteSecret = trpc.secret.deleteSecret.useMutation();
+    const utils = trpc.useUtils(); // refetch secrets after mutations
     const { data: secrets, isLoading: isLoadingSecrets } = trpc.secret.getSecrets.useQuery();
-    console.log('secrets', secrets, isLoadingSecrets);
     const [search, setSearch] = useState('');
 
     const [open, setOpen] = useState(false);
@@ -105,7 +108,15 @@ export default function Dashboard({ onLogout }: Props) {
         };
 
         if (editMode && editingId) {
-            // editing mode is here
+            updateSecret.mutate(
+                { id: editingId, ...payload },
+                {
+                    onSuccess: () => {
+                        utils.secret.getSecrets.invalidate(); // refresh list
+                        console.log('Secret updated!');
+                    },
+                }
+            );
         } else {
             createSecret.mutate(payload, {
                 onSuccess: () => {
@@ -130,11 +141,18 @@ export default function Dashboard({ onLogout }: Props) {
 
     const confirmDelete = () => {
         if (deleteTarget) {
-           // delete secret here
+            deleteSecret.mutate(
+                { id: deleteTarget.id },
+                {
+                    onSuccess: () => {
+                        utils.secret.getSecrets.invalidate();
+                        setDeleteTarget(null);
+                    },
+                }
+            );
             setDeleteTarget(null);
         }
     };
-
 
     return (
         <Box sx={{ width: '100%', minHeight: '100vh', p: 4 }}>
@@ -185,18 +203,19 @@ export default function Dashboard({ onLogout }: Props) {
                                         {new Date(secret.expiresAt).toLocaleString()}
                                     </TableCell>
                                     <TableCell>
-                                        {isExpired(secret.expiresAt)
-                                            ? 'Expired'
-                                            : secret.viewed && secret.oneTime
-                                                ? 'Deleted'
-                                                : 'Active'
-                                        }
+                                        {isExpired(secret.expiresAt) ? (
+                                            <Chip label="Expired" color="error" />
+                                        ) : secret.viewed && secret.oneTime ? (
+                                            <Chip label="Deleted" color="warning" />
+                                        ) : (
+                                            <Chip label="Active" color="success" />
+                                        )}
                                     </TableCell>
                                     <TableCell>
-                                        <IconButton onClick={() => handleEdit(secret)}>
+                                        <IconButton color={"info"} onClick={() => handleEdit(secret)}>
                                             <Edit />
                                         </IconButton>
-                                        <IconButton onClick={() => handleDeleteClick(secret)}>
+                                        <IconButton color={"warning"} onClick={() => handleDeleteClick(secret)}>
                                             <Delete />
                                         </IconButton>
                                     </TableCell>

@@ -24,5 +24,34 @@ export const secretRouter = router({
                 expiresAt: new Date(input.expiresAt),
             },
         });
-    })
+    }),
+
+    updateSecret: publicProcedure.input(
+        z.object({
+            id: z.string(),
+            content: z.string(),
+            oneTime: z.boolean(),
+            password: z.string().optional(),
+            expiresAt: z.string(),
+        })
+    ).mutation(async ({ ctx, input }) => {
+        return ctx.prisma.secret.update({
+            where: { id: input.id },
+            data: {
+                content: input.content,
+                oneTime: input.oneTime,
+                password: input.password,
+                expiresAt: new Date(input.expiresAt)
+            }
+        })
+    }),
+
+    deleteSecret: publicProcedure.input(
+        z.object({ id: z.string()
+        })
+    ).mutation(async ({ ctx, input }) => {
+        return ctx.prisma.secret.delete({
+            where: {id: input.id},
+        });
+    }),
 });
