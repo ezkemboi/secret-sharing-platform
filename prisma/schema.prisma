@@ -20,7 +20,21 @@ model Secret {
   oneTime      Boolean  @default(true)
   viewed       Boolean  @default(false)
   expiresAt    DateTime
+  // check on how to manage number of views
   password     String?  // optional if password protected
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  // link
+  link      SecretLink?
+}
+
+model SecretLink {
+  id           String   @id @default(uuid())
+  secretId     String  @unique
+  viewed       Boolean
+  expiresAt    DateTime // Use Status or this expiry
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  // secret
+  secret       Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
 }
