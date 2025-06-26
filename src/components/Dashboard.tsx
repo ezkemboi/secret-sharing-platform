@@ -42,6 +42,8 @@ export default function Dashboard({ onLogout }: Props) {
     const createSecret = trpc.secret.createSecret.useMutation();
     const updateSecret = trpc.secret.updateSecret.useMutation();
     const deleteSecret = trpc.secret.deleteSecret.useMutation();
+    const [shareableUrl, setShareableUrl] = useState('');
+    const [showLinkDialog, setShowLinkDialog] = useState(false);
     const utils = trpc.useUtils(); // refetch secrets after mutations
     const { data: secrets } = trpc.secret.getSecrets.useQuery();
     const [search, setSearch] = useState('');
@@ -119,9 +121,10 @@ export default function Dashboard({ onLogout }: Props) {
             );
         } else {
             createSecret.mutate(payload, {
-                onSuccess: () => {
-                    console.log('Secret created!');
-                    // You can refetch secrets or clear form here
+                onSuccess: (data) => {
+                    setShareableUrl(data.shareableUrl);
+                    setShowLinkDialog(true);
+                    utils.secret.getSecrets.invalidate();
                 },
                 onError: (err) => {
                     console.error('Failed to create secret:', err);
@@ -296,6 +299,37 @@ export default function Dashboard({ onLogout }: Props) {
                     <Button onClick={confirmDelete} color="error" variant="contained">
                         Delete
                     </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog open={showLinkDialog} onClose={() => setShowLinkDialog(false)} maxWidth="sm" fullWidth>
+                <DialogTitle>🎉 Secret Created!</DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ mb: 2 }}>Here is your secure link:</Typography>
+                    <Paper sx={{ p: 2, bgcolor: '#f5f5f5', wordBreak: 'break-all' }}>
+                        {shareableUrl}
+                    </Paper>
+
+                    <Box display="flex" justifyContent="flex-start" gap={2} mt={2}>
+                        <Button
+                            variant="outlined"
+                            onClick={() => navigator.clipboard.writeText(shareableUrl)}
+                        >
+                            Copy Link
+                        </Button>
+
+                        <a
+                            href={`mailto:?subject=Secret Link&body=Here is your secure secret link:\n\n${shareableUrl}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <Button variant="contained" color="primary">
+                                Share via Email
+                            </Button>
+                        </a>
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setShowLinkDialog(false)}>Close</Button>
                 </DialogActions>
             </Dialog>
         </Box>

@@ -40,9 +40,10 @@ export const secretRouter = router({
             },
         });
         const encryptedId = encrypt(link.id);
-        console.log('------>>>>>>>', encryptedId, `${process.env.DOMAIN}/s/${encodeURIComponent(encryptedId)}`);
-        // can see if we can save in a DB or not, since, if we encrypt, the same results is received
-        return secret;
+        return {
+            secret,
+            shareableUrl: `${process.env.DOMAIN}/s/${encodeURIComponent(encryptedId)}`
+        };
     }),
 
     updateSecret: publicProcedure.input(
