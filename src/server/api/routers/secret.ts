@@ -90,48 +90,63 @@ export const secretRouter = router({
                 include: { secret: true },
             });
 
-            if (!link) throw new Error('Invalid or expired link');
-            if (link.expiresAt < new Date()) throw new Error('Link expired');
+            if (!link) throw new TRPCError({ code: 'NOT_FOUND', message: 'Secret link not found' });
 
-            // Optional: mark viewed
-            await ctx.prisma.secret.update({
-                where: { id: link.secretId },
-                data: { viewed: true }
-            });
+            const now = new Date();
+            if (link.expiresAt < now) {
+                throw new TRPCError({ code: 'FORBIDDEN', message: 'This secret has expired.' });
+            }
 
-            // if password needed
-            const { secret } = link;
+            const { secret } = link
+
+            if (secret.viewed && secret.oneTime) {
+                throw new TRPCError({ code: 'BAD_REQUEST', message: 'This secret was already viewed.' });
+            }
+
             return {
-                id: link.id,
                 expiresAt: link.expiresAt,
-                secret: secret.password
-                    ? undefined // Do NOT send content if password protected
-                    : {
-                        content: secret.content,
-                    },
+                oneTime: secret.oneTime,
+                requirePassword: !!secret.password,
+                viewed: secret.viewed,
+                encryptedId: input.encryptedId
             };
         }
     ),
 
-    verifyPassword: publicProcedure
-        .input(z.object({
-            encryptedId: z.string(),
-            password: z.string(),
-        }))
-        .mutation(async ({ ctx, input }) => {
-            const link = await ctx.prisma.secretLink.findUnique({
-                where: { id: decrypt(input.encryptedId) }, // assuming you're encrypting `id`
-                include: { secret: true },
+    viewLink: publicProcedure.input(z.object({
+        encryptedId: z.string(),
+        password: z.string().optional(),
+    })).mutation(async ({ ctx, input }) => {
+        const link = await ctx.prisma.secretLink.findUnique({
+            where: { id: decrypt(input.encryptedId) }, // assuming you're encrypting `id`
+            include: { secret: true },
+        });
+
+        if (!link) throw new TRPCError({ code: 'NOT_FOUND', message: 'Link not found' });
+        if (link.expiresAt < new Date()) throw new TRPCError({ code: 'FORBIDDEN', message: 'Expired link' });
+        const { secret } = link;
+
+        // Check if secret was already viewed and was one-time
+        if (secret.viewed && secret.oneTime) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'This secret was already viewed.' });
+        }
+
+        // Check password
+        if (secret.password && secret.password !== input.password) {
+            throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Incorrect password' });
+        }
+
+        // Mark as viewed + delete link if it's a one-time secret
+        if (secret.oneTime) {
+            await ctx.prisma.secret.update({
+                where: { id: secret.id },
+                data: { viewed: true },
             });
+            await ctx.prisma.secretLink.delete({
+                where: { id: link.id },
+            });
+        }
 
-            if (!link || new Date(link.expiresAt) < new Date()) {
-                throw new TRPCError({ code: 'NOT_FOUND', message: 'Secret expired or not found' });
-            }
-
-            if (link.secret?.password !== input.password) {
-                throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Incorrect password' });
-            }
-
-            return { content: link.secret.content };
+        return { content: secret.content };
     })
 });

@@ -17,7 +17,8 @@ export default function SecretViewPage() {
 
     const [enteredPassword, setEnteredPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
-    const [revealedContent, setRevealedContent] = useState<string | null>(null);
+    const [showSecret, setShowSecret] = useState(false);
+    const [secretContent, setSecretContent] = useState('');
 
     const {
         data: secretLink,
@@ -28,20 +29,21 @@ export default function SecretViewPage() {
         { enabled: !!id }
     );
 
-    const verifyPassword = trpc.secret.verifyPassword.useMutation({
+    const viewLink = trpc.secret.viewLink.useMutation({
         onSuccess: (data) => {
-            setRevealedContent(data.content);
+            setSecretContent(data.content);
+            setShowSecret(true);
         },
-        onError: () => {
+        onError: (err) => {
             setPasswordError('Invalid password. Please try again.');
         },
     });
 
-    const handleSubmitPassword = () => {
+    const handleViewSecret = () => {
         setPasswordError('');
-        verifyPassword.mutate({
+        viewLink.mutate({
             encryptedId: id as string,
-            password: enteredPassword,
+            password: secretLink?.requirePassword ? enteredPassword : undefined,
         });
     };
 
@@ -54,26 +56,21 @@ export default function SecretViewPage() {
         );
     }
 
-    if (error || !secretLink) {
+    if (error) {
+        let message = 'An unexpected error occurred.';
+        if (error.data?.code === 'FORBIDDEN') {
+            message = 'This secret link has expired.';
+        } else if (error.data?.code === 'BAD_REQUEST') {
+            message = 'This secret was already viewed and is no longer available.';
+        } else if (error.data?.code === 'NOT_FOUND') {
+            message = 'Secret not found.';
+        }
         return (
             <Box textAlign="center" mt={8}>
-                <Alert severity="error">
-                    {error?.message ?? 'Secret not found or already expired.'}
-                </Alert>
+                <Alert severity="error">{message}</Alert>
             </Box>
         );
     }
-
-    const isExpired = new Date(secretLink.expiresAt) < new Date();
-    if (isExpired) {
-        return (
-            <Box textAlign="center" mt={8}>
-                <Alert severity="warning">This secret has expired.</Alert>
-            </Box>
-        );
-    }
-
-    const hasPassword = !!secretLink.password;
 
     return (
         <Box display="flex" justifyContent="center" mt={8}>
@@ -82,42 +79,47 @@ export default function SecretViewPage() {
                     🔐 Secret Message
                 </Typography>
 
-                {!revealedContent && hasPassword ? (
-                    <>
-                        <Typography sx={{ mb: 2 }}>
-                            This secret is protected. Please enter the password to view it.
-                        </Typography>
-
-                        {passwordError && <Alert severity="error">{passwordError}</Alert>}
-
-                        <TextField
-                            label="Password"
-                            type="password"
-                            fullWidth
-                            value={enteredPassword}
-                            onChange={(e) => setEnteredPassword(e.target.value)}
-                            sx={{ mt: 2 }}
-                        />
-
-                        <Button
-                            variant="contained"
-                            sx={{ mt: 2 }}
-                            onClick={handleSubmitPassword}
-                            disabled={verifyPassword.isLoading}
-                        >
-                            {verifyPassword.isLoading ? 'Verifying...' : 'View Secret'}
-                        </Button>
-                    </>
-                ) : (
+                {showSecret ? (
                     <>
                         <Alert severity="success" sx={{ mb: 2 }}>
-                            You may now view the secret.
+                            Secret loaded.
                         </Alert>
                         <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f5f5f5' }}>
                             <Typography component="pre" sx={{ wordBreak: 'break-word' }}>
-                                {revealedContent ?? secretLink?.secret?.content}
+                                {secretContent}
                             </Typography>
                         </Paper>
+                    </>
+                ) : (
+                    <>
+                        {secretLink?.requirePassword && (
+                            <>
+                                <Typography sx={{ mb: 2 }}>
+                                    This secret is protected. Please enter the password.
+                                </Typography>
+                                {passwordError && (
+                                    <Alert severity="error" sx={{ mb: 2 }}>
+                                        {passwordError}
+                                    </Alert>
+                                )}
+                                <TextField
+                                    label="Password"
+                                    type="password"
+                                    fullWidth
+                                    value={enteredPassword}
+                                    onChange={(e) => setEnteredPassword(e.target.value)}
+                                    sx={{ mb: 2 }}
+                                />
+                            </>
+                        )}
+
+                        <Button
+                            variant="contained"
+                            onClick={handleViewSecret}
+                            disabled={viewLink.isLoading}
+                        >
+                            {viewLink.isLoading ? 'Loading...' : 'View Secret'}
+                        </Button>
                     </>
                 )}
             </Paper>

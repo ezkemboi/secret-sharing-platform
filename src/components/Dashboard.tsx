@@ -206,7 +206,7 @@ export default function Dashboard({ onLogout }: Props) {
                                         {isExpired(secret.expiresAt) ? (
                                             <Chip label="Expired" color="error" />
                                         ) : secret.viewed && secret.oneTime ? (
-                                            <Chip label="Deleted" color="warning" />
+                                            <Chip label="Viewed" color="secondary" />
                                         ) : (
                                             <Chip label="Active" color="success" />
                                         )}
