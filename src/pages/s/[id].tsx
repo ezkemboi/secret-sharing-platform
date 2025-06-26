@@ -34,7 +34,8 @@ export default function SecretViewPage() {
             setSecretContent(data.content);
             setShowSecret(true);
         },
-        onError: (err) => {
+        onError: (err: unknown) => {
+            console.log(err);
             setPasswordError('Invalid password. Please try again.');
         },
     });
@@ -116,9 +117,9 @@ export default function SecretViewPage() {
                         <Button
                             variant="contained"
                             onClick={handleViewSecret}
-                            disabled={viewLink.isLoading}
+                            disabled={viewLink.status === 'pending'}
                         >
-                            {viewLink.isLoading ? 'Loading...' : 'View Secret'}
+                            {viewLink?.isPending ? 'Loading...' : 'View Secret'}
                         </Button>
                     </>
                 )}
