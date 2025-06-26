@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { router, publicProcedure } from '../trpc';
+import { TRPCError } from '@trpc/server';
 import { encrypt, decrypt } from '@/utils/encryption';
 
 export const secretRouter = router({
@@ -35,11 +36,9 @@ export const secretRouter = router({
             },
         });
         const encryptedId = encrypt(link.id);
+        console.log('------>>>>>>>', encryptedId, `${process.env.DOMAIN}/s/${encodeURIComponent(encryptedId)}`);
         // can see if we can save in a DB or not, since, if we encrypt, the same results is received
-        return {
-            ...secret,
-            shareableLink: `${process.env.DOMAIN}/s/${encodeURIComponent(encryptedId)}`
-        };
+        return secret;
     }),
 
     updateSecret: publicProcedure.input(
@@ -100,7 +99,39 @@ export const secretRouter = router({
                 data: { viewed: true }
             });
 
-            return link.secret; // what to send
+            // if password needed
+            const { secret } = link;
+            return {
+                id: link.id,
+                expiresAt: link.expiresAt,
+                secret: secret.password
+                    ? undefined // Do NOT send content if password protected
+                    : {
+                        content: secret.content,
+                    },
+            };
         }
-    )
+    ),
+
+    verifyPassword: publicProcedure
+        .input(z.object({
+            encryptedId: z.string(),
+            password: z.string(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const link = await ctx.prisma.secretLink.findUnique({
+                where: { id: decrypt(input.encryptedId) }, // assuming you're encrypting `id`
+                include: { secret: true },
+            });
+
+            if (!link || new Date(link.expiresAt) < new Date()) {
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Secret expired or not found' });
+            }
+
+            if (link.secret?.password !== input.password) {
+                throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Incorrect password' });
+            }
+
+            return { content: link.secret.content };
+    })
 });

@@ -2,26 +2,26 @@ import crypto from 'crypto';
 
 const algorithm = 'aes-256-cbc';
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY as string; // Must be 32 bytes
-const IV_LENGTH = 16; // AES block size
+const IV_LENGTH = 16; // 128 bits
 
 export function encrypt(text: string): string {
     const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv(algorithm, Buffer.from(ENCRYPTION_KEY), iv);
-    let encrypted = cipher.update(text);
-
+    const cipher = crypto.createCipheriv(algorithm, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+    let encrypted = cipher.update(text, 'utf-8');
     encrypted = Buffer.concat([encrypted, cipher.final()]);
 
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
+    const output = Buffer.concat([iv, encrypted]);
+    return output.toString('base64url'); // Requires Node 16+
 }
 
-export function decrypt(encryptedText: string): string {
-    const [ivHex, encryptedHex] = encryptedText.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const encrypted = Buffer.from(encryptedHex, 'hex');
-    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY), iv);
+export function decrypt(base64url: string): string {
+    const input = Buffer.from(base64url, 'base64url');
+    const iv = input.subarray(0, IV_LENGTH);
+    const encryptedText = input.subarray(IV_LENGTH);
 
-    let decrypted = decipher.update(encrypted);
+    const decipher = crypto.createDecipheriv(algorithm, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+    let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
 
-    return decrypted.toString();
+    return decrypted.toString('utf-8');
 }

@@ -31,7 +31,7 @@ model Secret {
 model SecretLink {
   id           String   @id @default(uuid())
   secretId     String  @unique
-  viewed       Boolean
+  viewed       Boolean?
   expiresAt    DateTime // Use Status or this expiry
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
