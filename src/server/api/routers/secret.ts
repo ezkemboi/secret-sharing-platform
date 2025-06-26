@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { router, publicProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
 import { encrypt, decrypt } from '@/utils/encryption';
+import bcrypt from 'bcrypt';
 
 export const secretRouter = router({
     getSecrets: publicProcedure.query(async ({ ctx }) => {
@@ -19,12 +20,15 @@ export const secretRouter = router({
             expiresAt: z.string(),
         })
     ).mutation(async ({ ctx, input }) => {
+        const hashedPassword = input.password
+            ? await bcrypt.hash(input.password, 10)
+            : undefined;
         const secret = await ctx.prisma.secret.create({
             data: {
                 // add user_id for creation of user
                 content: input.content,
                 oneTime: input.oneTime,
-                password: input.password,
+                password: hashedPassword,
                 expiresAt: new Date(input.expiresAt),
             },
         });
@@ -132,8 +136,10 @@ export const secretRouter = router({
         }
 
         // Check password
-        if (secret.password && secret.password !== input.password) {
-            throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Incorrect password' });
+        const hasPassword = !!link.secret?.password;
+        if (hasPassword) {
+            const valid = await bcrypt.compare(input.password ?? '', link.secret.password ?? '');
+            if (!valid) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Incorrect password' });
         }
 
         // Mark as viewed + delete link if it's a one-time secret
