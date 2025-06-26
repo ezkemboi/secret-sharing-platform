@@ -43,7 +43,7 @@ export default function Dashboard({ onLogout }: Props) {
     const updateSecret = trpc.secret.updateSecret.useMutation();
     const deleteSecret = trpc.secret.deleteSecret.useMutation();
     const utils = trpc.useUtils(); // refetch secrets after mutations
-    const { data: secrets, isLoading: isLoadingSecrets } = trpc.secret.getSecrets.useQuery();
+    const { data: secrets } = trpc.secret.getSecrets.useQuery();
     const [search, setSearch] = useState('');
 
     const [open, setOpen] = useState(false);
