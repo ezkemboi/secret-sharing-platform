@@ -29,6 +29,8 @@ export const authOptions = {
     ],
     session: {
         strategy: "jwt" as SessionStrategy,
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+        updateAge: 24 * 60 * 60, // update every 24hrs
     },
     pages: {
         signIn: "/",
@@ -37,4 +39,4 @@ export const authOptions = {
 
 const handler = NextAuth(authOptions);
 
-export default handler; // ✅ required
+export default handler;

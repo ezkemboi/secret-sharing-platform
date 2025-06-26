@@ -1,18 +1,19 @@
 import { z } from 'zod';
-import { router, publicProcedure } from '../trpc';
+import { router, protectedProcedure, publicProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
 import { encrypt, decrypt } from '@/utils/encryption';
 import bcrypt from 'bcrypt';
 
 export const secretRouter = router({
-    getSecrets: publicProcedure.query(async ({ ctx }) => {
+    getSecrets: protectedProcedure.query(async ({ ctx }) => {
+        const userId = ctx.session.user.id;
         return ctx.prisma.secret.findMany({
-            // add get by user, the secrets
+            where: { userId },
             orderBy: {createdAt: 'desc'},
         });
     }),
 
-    createSecret: publicProcedure.input(
+    createSecret: protectedProcedure.input(
         z.object({
             content: z.string().min(1),
             oneTime: z.boolean(),
@@ -20,6 +21,7 @@ export const secretRouter = router({
             expiresAt: z.string(),
         })
     ).mutation(async ({ ctx, input }) => {
+        const userId = ctx.session.user.id;
         const hashedPassword = input.password
             ? await bcrypt.hash(input.password, 10)
             : undefined;
@@ -30,6 +32,7 @@ export const secretRouter = router({
                 oneTime: input.oneTime,
                 password: hashedPassword,
                 expiresAt: new Date(input.expiresAt),
+                userId: userId,
             },
         });
 
@@ -46,7 +49,7 @@ export const secretRouter = router({
         };
     }),
 
-    updateSecret: publicProcedure.input(
+    updateSecret: protectedProcedure.input(
         z.object({
             id: z.string(),
             content: z.string(),
@@ -76,7 +79,7 @@ export const secretRouter = router({
         return secret
     }),
 
-    deleteSecret: publicProcedure.input(
+    deleteSecret: protectedProcedure.input(
         z.object({ id: z.string() })
     ).mutation(async ({ ctx, input }) => {
         // Make sure the original person is the one deleting the secret (use token for this)
