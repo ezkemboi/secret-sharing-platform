@@ -1,29 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Container } from '@mui/material';
-import Login  from '@/components/Login';
-import Dashboard  from '@/components/Dashboard';
+// pages/index.tsx
+import { useSession, signIn, signOut } from "next-auth/react";
+import Dashboard from "@/components/Dashboard";
+import Login from "@/components/Login";
 
 export default function Home() {
-  const [token, setToken] = useState<string | null>(null);
+  const { data: session, status } = useSession();
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) setToken(storedToken);
-  }, []);
+  if (status === "loading") return <p>Loading...</p>;
 
-  const handleLogin = () => setToken('demo-token');
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-  };
-
-  return (
-      <Container>
-        {!token ? (
-            <Login onLogin={handleLogin} />
-        ) : (
-            <Dashboard onLogout={handleLogout} />
-        )}
-      </Container>
-  )
+  return session ? (
+      <Dashboard onLogout={() => signOut()} />
+  ) : (
+      <Login onLogin={() => signIn()} />
+  );
 }
