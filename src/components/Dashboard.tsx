@@ -54,7 +54,7 @@ export default function Dashboard({ onLogout }: Props) {
 
     const [secret, setSecret] = useState('');
     const [viewOnce, setViewOnce] = useState(true);
-    const [requirePassword, setRequirePassword] = useState(true);
+    const [requirePassword, setRequirePassword] = useState(false);
     const [password, setPassword] = useState('');
 
     const [deleteTarget, setDeleteTarget] = useState<Secret | null>(null);
@@ -92,7 +92,7 @@ export default function Dashboard({ onLogout }: Props) {
         setSecret('');
         setPassword('');
         setExpiresAt(defaultExpiry);
-        setRequirePassword(true);
+        setRequirePassword(false);
         setViewOnce(true);
     };
 

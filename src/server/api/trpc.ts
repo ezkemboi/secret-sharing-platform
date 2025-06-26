@@ -8,6 +8,7 @@ import { type NextApiRequest, type NextApiResponse } from 'next';
 // Updated context type
 export const createContext = async ({ req, res }: { req: NextApiRequest; res: NextApiResponse }) => {
     const session = await getServerSession(req, res, authOptions);
+    console.log(session);
     return {
         prisma,
         session,

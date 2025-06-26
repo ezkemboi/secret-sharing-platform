@@ -1,9 +1,15 @@
-import NextAuth, { SessionStrategy } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
+import NextAuth, { type NextAuthOptions, type Session } from "next-auth";
+import CredentialsProvider, { type CredentialsConfig } from "next-auth/providers/credentials";
 import { prisma } from "../../../../lib/prisma";
 import bcrypt from "bcrypt";
+import type { JWT as JWTType } from "next-auth/jwt";
 
-export const authOptions = {
+interface CustomToken extends JWTType {
+    id?: string;
+    email?: string | null;
+}
+
+export const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
             name: "Credentials",
@@ -25,18 +31,35 @@ export const authOptions = {
 
                 return { id: user.id, email: user.email };
             },
-        }),
+        }) as CredentialsConfig<{
+            email: { label: string; type: string };
+            password: { label: string; type: string };
+        }>,
     ],
+    callbacks: {
+        async session({ session, token }): Promise<Session> {
+            if (session.user) {
+                session.user.id = token.id as string;
+                session.user.email = token.email ?? '';
+            }
+            return session;
+        },
+        async jwt({ token, user }): Promise<CustomToken> {
+            if (user) {
+                token.id = user.id;
+                token.email = user.email;
+            }
+            return token;
+        },
+    },
     session: {
-        strategy: "jwt" as SessionStrategy,
+        strategy: "jwt",
         maxAge: 7 * 24 * 60 * 60, // 7 days
-        updateAge: 24 * 60 * 60, // update every 24hrs
+        updateAge: 24 * 60 * 60, // 24 hours
     },
     pages: {
         signIn: "/",
     },
 };
 
-const handler = NextAuth(authOptions);
-
-export default handler;
+export default NextAuth(authOptions);
