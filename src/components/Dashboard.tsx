@@ -158,7 +158,7 @@ export default function Dashboard({ onLogout }: Props) {
     };
 
     return (
-        <Box sx={{ width: '100%', minHeight: '100vh', p: 4 }}>
+        <Box sx={{ width: '95%', minHeight: '100vh', p: 4 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
                 <Typography variant="h4">🔐 Secrets Dashboard</Typography>
                 <Box display="flex" gap={2}>
